@@ -1,0 +1,258 @@
+
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>いないいないばあ！</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  overflow: hidden;
+  text-align: center;
+  font-family: sans-serif;
+  background: linear-gradient(#a8eaff,#fff1c9);
+  user-select: none;
+}
+
+h1 {
+  color: #ff5d9e;
+  font-size: clamp(24px,5vw,42px);
+  text-shadow: 2px 2px white;
+  margin: 15px 0;
+}
+
+#stage {
+  height: 75vh;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+#character {
+  font-size: clamp(130px,30vw,230px);
+  display: inline-block;
+  transition: transform .65s ease;
+  filter: drop-shadow(0 8px 4px #9995);
+}
+
+.back {
+  transform: rotateY(0deg);
+}
+
+.front {
+  transform: rotateY(360deg);
+}
+
+#message {
+  font-size: clamp(28px,6vw,46px);
+  color: #ff5795;
+  font-weight: bold;
+  text-shadow: 2px 2px white;
+  margin-top: 15px;
+}
+
+#hint {
+  color: #815a78;
+  font-size: 18px;
+}
+
+button {
+  border: none;
+  border-radius: 30px;
+  background: #ff76ad;
+  color: white;
+  padding: 12px 22px;
+  font-size: 17px;
+  margin: 5px;
+  cursor: pointer;
+}
+
+.effect {
+  position: absolute;
+  pointer-events: none;
+  font-size: 35px;
+  animation: fly 1.5s ease-out forwards;
+}
+
+@keyframes fly {
+  from { transform: translateY(0) scale(.5); opacity: 1; }
+  to { transform: translateY(-230px) scale(1.8); opacity: 0; }
+}
+
+#character.bounce {
+  animation: bounce .5s ease;
+}
+
+@keyframes bounce {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+</style>
+</head>
+
+<body>
+
+<h1>🌈 いないいないばあ！ 🌈</h1>
+
+<div id="stage" onclick="playGame()">
+  <div id="character">🐖</div>
+  <div id="message">いないいない……</div>
+  <div id="hint">画面をタッチしてね！ 👆</div>
+</div>
+
+<div>
+  <button onclick="changeCharacter(event,0)">🐷 ブタ</button>
+  <button onclick="changeCharacter(event,1)">🐰 ウサギ</button>
+  <button onclick="changeCharacter(event,2)">🐱 ネコ</button>
+  <button onclick="musicToggle(event)" id="musicButton">🎵 音楽 ON</button>
+</div>
+
+<script>
+const characters = [
+  {back:"🐖",front:["🐷","🐽","🐷"]},
+  {back:"🐰",front:["🐰","🐇","🐰"]},
+  {back:"🐈",front:["🐱","😻","😺"]}
+];
+
+const sounds = ["💕","🌸","⭐","🎉","🌈","💖"];
+let selected = 0;
+let turned = false;
+let playing = false;
+let music = false;
+let audio;
+let musicTimer;
+
+const character = document.getElementById("character");
+const message = document.getElementById("message");
+
+function speak(text) {
+  if (!("speechSynthesis" in window)) return;
+
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "ja-JP";
+  utterance.rate = 0.85;
+  utterance.pitch = 1.4;
+  speechSynthesis.speak(utterance);
+}
+
+function playTone(freq,duration) {
+  try {
+    audio = audio || new (window.AudioContext ||
+      window.webkitAudioContext)();
+
+    if(audio.state === "suspended") audio.resume();
+
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(.12,audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+      .001,audio.currentTime + duration
+    );
+
+    osc.connect(gain);
+    gain.connect(audio.destination);
+    osc.start();
+    osc.stop(audio.currentTime + duration);
+  } catch(e) {}
+}
+
+function musicToggle(e) {
+  e.stopPropagation();
+  music = !music;
+
+  document.getElementById("musicButton").textContent =
+    music ? "🎵 音楽 OFF" : "🎵 音楽 ON";
+
+  if(music) {
+    playTone(523,.3);
+    speak("音楽スタート！");
+    musicTimer = setInterval(() => {
+      playTone([523,659,784,659][
+        Math.floor(Math.random()*4)
+      ],.25);
+    },450);
+  } else {
+    clearInterval(musicTimer);
+  }
+}
+
+function changeCharacter(e,n) {
+  e.stopPropagation();
+  selected = n;
+  turned = false;
+  character.textContent = characters[n].back;
+  character.classList.remove("front");
+  message.textContent = "いないいない……";
+}
+
+function effects() {
+  for(let i=0;i<15;i++) {
+    const el = document.createElement("div");
+    el.className = "effect";
+    el.textContent =
+      sounds[Math.floor(Math.random()*sounds.length)];
+
+    el.style.left = Math.random()*90 + "%";
+    el.style.top = (30+Math.random()*50) + "%";
+
+    document.getElementById("stage").appendChild(el);
+    setTimeout(()=>el.remove(),1600);
+  }
+}
+
+function playGame() {
+  if(playing) return;
+  playing = true;
+
+  if(!turned) {
+    message.textContent = "いないいない……";
+    speak("いないいない……");
+
+    setTimeout(() => {
+      character.textContent =
+        characters[selected].front[
+          Math.floor(Math.random()*3)
+        ];
+
+      character.classList.remove("back");
+      character.classList.add("front");
+
+      message.textContent = "ばあーー！！";
+      effects();
+      speak("ばあーー！！");
+
+      playTone(784,.3);
+      setTimeout(()=>playTone(988,.4),180);
+
+      turned = true;
+      playing = false;
+    },900);
+  } else {
+    character.textContent = characters[selected].back;
+    character.classList.remove("front");
+    character.classList.add("back");
+    message.textContent = "もういっかい！";
+    turned = false;
+    playTone(523,.3);
+    playing = false;
+  }
+}
+</script>
+
+</body>
+</html>
++
+6
